@@ -1,0 +1,108 @@
+---
+title: "Practical machine learning"
+author: "Julian Flowers"
+date: "6 March 2016"
+output: html_document
+---
+## Summary
+
+This exercise presents summary and analysis of the weight lifting exercises dataset as part of the Coursera Practical Machine Learning course.  
+
+The data is [here](http://groupware.les.inf.puc-rio.br/har). It consists of a series of measures on 6 healthy volunteers of 10 repetitions of Unilateral Dumbell Curls (UDC) performed in 5 different ways of which one was correct. The objective of the analysis is to predict which form of UDC each of 20 test subjects performed.
+
+First we need to downoad and examine the data.
+
+## Downloads
+```{r, cache = TRUE, message=FALSE}
+
+train <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", na.strings = c("NA","#DIV/0!"))
+
+test <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", na.strings = c("NA","#DIV/0!"))
+dim (train)
+```
+
+
+## Extract the sensor data
+
+We need to limit the dataset to the measure variables only, and we will exclude those variables with high proportions of missing data. 
+
+```{r}
+sensordata <- grep(pattern = "_belt|_arm|_dumbbell|_forearm", names(train))
+data <- train[,c(sensordata, 160)]
+datatest <- test[,c(sensordata, 160)]
+
+nadata<- apply(data, 2, function(x) mean(is.na(x)))
+t <- which(nadata >0)
+train1 <- data[,-t]
+
+nadatatest<- apply(datatest, 2, function(x) mean(is.na(x)))
+t <- which(nadatatest >0)
+test1 <- datatest[,-t]
+
+dim(train1); dim(test1)
+```
+
+## Loading necessary packages
+```{r}
+library(caret)
+library(randomForest)
+library(corrplot)
+```
+
+## Setting up training and test sets 
+
+```{r}
+## partition data
+set.seed(123)
+train <- createDataPartition(train1$classe, p=0.6, list = FALSE)
+inTrain <- train1[train,]
+inTest <- train1[-train,]
+dim(inTrain); dim(inTest)
+```
+
+## Examine relationships between variables
+
+```{r}
+library(corrplot)
+cor <- cor(inTrain[, -53])
+corrplot(cor, order = "FPC", method = "color", type = "lower", tl.cex = 0.7, tl.col = rgb(0, 0, 0))
+
+```
+
+## Tree approach
+
+```{r}
+modtree <- train(classe~., data = inTrain, method = "rpart")
+
+plot(modtree$finalModel)
+text(modtree$finalModel, pretty = 1)
+predtree <- predict(modtree, inTest)
+confusionMatrix(predtree, inTest$classe)
+```
+
+Overall accuracy is poor at 0.51.
+
+
+```{r}
+set.seed(321)
+modrf <-randomForest(classe ~., data = inTrain, ntree = 500)
+modrf
+varImpPlot(modrf, cex = 0.5)
+
+```
+
+
+
+```{r}
+pred <- predict(modrf, inTest)
+confusionMatrix(pred, inTest$classe)
+
+```
+
+
+
+```{r}
+pred1 <- predict(modrf, test1)
+pred1
+```
+
